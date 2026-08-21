@@ -281,10 +281,13 @@ public class ModSettingsScreen : MonoBehaviour
         RectTransform row = CreateRow();
         CreateLabel(row, labelText);
 
-        Toggle toggle = Instantiate(_toggleTemplate, row);
-        toggle.gameObject.name = "LuckShotMod_Toggle";
-        StripLocalization(toggle);
-        UiUtil.ReplaceToggle(toggle, entry.Value, value => entry.Value = value);
+        Toggle toggleTemplate = Instantiate(_toggleTemplate, row);
+        toggleTemplate.gameObject.name = "LuckShotMod_Toggle";
+        StripLocalization(toggleTemplate);
+        // ReplaceToggle destroys toggleTemplate and returns a fresh component on the same
+        // GameObject - everything after this must use the returned reference, not the
+        // (now-destroyed) local we passed in.
+        Toggle toggle = UiUtil.ReplaceToggle(toggleTemplate, entry.Value, value => entry.Value = value);
         SetControlWidth(toggle.GetComponent<RectTransform>(), 40f);
     }
 
@@ -293,10 +296,10 @@ public class ModSettingsScreen : MonoBehaviour
         RectTransform row = CreateRow();
         CreateLabel(row, labelText);
 
-        Slider slider = Instantiate(_sliderTemplate, row);
-        slider.gameObject.name = "LuckShotMod_Slider";
-        StripLocalization(slider);
-        UiUtil.ReplaceSlider(slider, min, max, entry.Value, value => entry.Value = value);
+        Slider sliderTemplate = Instantiate(_sliderTemplate, row);
+        sliderTemplate.gameObject.name = "LuckShotMod_Slider";
+        StripLocalization(sliderTemplate);
+        Slider slider = UiUtil.ReplaceSlider(sliderTemplate, min, max, entry.Value, value => entry.Value = value);
         SetControlWidth(slider.GetComponent<RectTransform>(), 200f);
     }
 
@@ -305,10 +308,11 @@ public class ModSettingsScreen : MonoBehaviour
         RectTransform row = CreateRow();
         CreateLabel(row, labelText);
 
-        TMP_InputField field = Instantiate(_inputFieldTemplate, row);
-        field.gameObject.name = "LuckShotMod_InputField";
-        StripLocalization(field);
-        UiUtil.ReplaceInputField(field, entry.Value, text =>
+        TMP_InputField fieldTemplate = Instantiate(_inputFieldTemplate, row);
+        fieldTemplate.gameObject.name = "LuckShotMod_InputField";
+        StripLocalization(fieldTemplate);
+        TMP_InputField field = null;
+        field = UiUtil.ReplaceInputField(fieldTemplate, entry.Value, text =>
         {
             if (Hotkeys.IsValid(text))
             {
@@ -326,9 +330,9 @@ public class ModSettingsScreen : MonoBehaviour
     {
         RectTransform row = CreateRow();
 
-        Button button = Instantiate(_buttonTemplate, row);
-        button.gameObject.name = "LuckShotMod_Button";
-        UiUtil.ReplaceButton(button, onClick);
+        Button buttonTemplate = Instantiate(_buttonTemplate, row);
+        buttonTemplate.gameObject.name = "LuckShotMod_Button";
+        Button button = UiUtil.ReplaceButton(buttonTemplate, onClick);
 
         TMP_Text buttonLabel = button.GetComponentInChildren<TMP_Text>(true);
         if (buttonLabel != null)
