@@ -66,7 +66,6 @@ public static class UiUtil
         GameObject go = old.gameObject;
         Graphic targetGraphic = old.targetGraphic;
         Graphic checkGraphic = old.graphic;
-        ToggleGroup group = old.group;
         Selectable.Transition transition = old.transition;
         ColorBlock colors = old.colors;
         SpriteState spriteState = old.spriteState;
@@ -85,7 +84,12 @@ public static class UiUtil
         Toggle fresh = go.AddComponent<Toggle>();
         fresh.targetGraphic = targetGraphic;
         fresh.graphic = checkGraphic;
-        fresh.group = group;
+        // Deliberately NOT copying old.group: the harvested template's ToggleGroup (if any)
+        // would otherwise get shared across every single toggle we clone from it, and with
+        // Unity's default ToggleGroup.allowSwitchOff = false, a toggle can outright refuse to
+        // turn off if it's the last one "on" in that shared group - each of ours needs to be
+        // independent.
+        fresh.group = null;
         fresh.transition = transition;
         fresh.colors = colors;
         fresh.spriteState = spriteState;
