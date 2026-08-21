@@ -41,6 +41,16 @@
       <HintPath>$(GameManagedDir)\Unity.InputSystem.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- Button/RectTransform/etc. for injecting a real UI button into the pause menu -->
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(GameManagedDir)\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- TMP_Text for relabeling the cloned pause menu button -->
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(GameManagedDir)\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework.TrimEnd(`0123456789`))' == 'net'">

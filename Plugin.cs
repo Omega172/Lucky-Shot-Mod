@@ -38,7 +38,10 @@ public class Plugin : BaseUnityPlugin
         WinRound winRound = gameObject.AddComponent<WinRound>();
         winRound.Init(Config);
 
-        gameObject.AddComponent<ModMenu>().Init(Config, aimAssist, triggerbot, infiniteAmmo, instantReload, fireRateModifier, winRound);
+        ModMenu modMenu = gameObject.AddComponent<ModMenu>();
+        modMenu.Init(Config, aimAssist, triggerbot, infiniteAmmo, instantReload, fireRateModifier, winRound);
+
+        gameObject.AddComponent<PauseMenuIntegration>().Init(modMenu);
 
         _harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
         _harmony.PatchAll();

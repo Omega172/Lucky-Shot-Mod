@@ -50,6 +50,12 @@ public class ModMenu : MonoBehaviour
         _menuHotkeyBuffer = _toggleHotkey.Value;
     }
 
+    // Called from the button PauseMenuIntegration injects into the game's own pause menu.
+    public void ToggleOpen()
+    {
+        _manuallyOpen = !_manuallyOpen;
+    }
+
     private void Update()
     {
         if (!_menuToggleKeyEnabled.Value)

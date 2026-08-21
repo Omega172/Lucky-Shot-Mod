@@ -1,0 +1,103 @@
+using System.Reflection;
+using HarmonyLib;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace LuckShotMod;
+
+// Best-effort attempt to add a real button into the game's own pause menu (a clone of the
+// existing "Resume" button, for matching style/layout/animation) that opens ModMenu.
+//
+// SettingsMenuManager's pause screen is entirely private with no public API for adding
+// entries, so this relies on reflecting one private field (pauseMenuScreen) and searching
+// its hierarchy by GameObject name (the same technique the game's own code uses internally,
+// e.g. ResolveExitToMenuOption searches for a child literally named "ExitToMenu"). If any of
+// this breaks on a game update, injection just silently fails - the F1 hotkey and
+// pause-triggered ModMenu overlay keep working regardless, this is purely additive.
+public class PauseMenuIntegration : MonoBehaviour
+{
+    private const string InjectedButtonName = "LuckShotMod_OpenMenuButton";
+    private const string ResumeButtonName = "Resume";
+
+    private static readonly FieldInfo PauseMenuScreenField = AccessTools.Field(typeof(SettingsMenuManager), "pauseMenuScreen");
+
+    private ModMenu _modMenu;
+    private bool _injected;
+
+    public void Init(ModMenu modMenu)
+    {
+        _modMenu = modMenu;
+    }
+
+    private void Update()
+    {
+        if (!_injected)
+        {
+            TryInject();
+        }
+    }
+
+    private void TryInject()
+    {
+        UIScreen pauseScreen = ResolvePauseScreen();
+        if (pauseScreen == null)
+        {
+            return;
+        }
+
+        Transform resumeTransform = FindChildByName(pauseScreen.transform, ResumeButtonName);
+        if (resumeTransform == null)
+        {
+            return;
+        }
+
+        if (resumeTransform.parent != null && resumeTransform.parent.Find(InjectedButtonName) != null)
+        {
+            _injected = true;
+            return;
+        }
+
+        Button template = resumeTransform.GetComponent<Button>() ?? resumeTransform.GetComponentInChildren<Button>(true);
+        if (template == null)
+        {
+            return;
+        }
+
+        Button clone = Instantiate(template, template.transform.parent);
+        clone.name = InjectedButtonName;
+        clone.onClick.RemoveAllListeners();
+        clone.onClick.AddListener(_modMenu.ToggleOpen);
+
+        TMP_Text label = clone.GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+        {
+            label.text = "MODS";
+        }
+
+        clone.transform.SetSiblingIndex(template.transform.GetSiblingIndex() + 1);
+        _injected = true;
+    }
+
+    private static UIScreen ResolvePauseScreen()
+    {
+        if (PauseMenuScreenField == null)
+        {
+            return null;
+        }
+        SettingsMenuManager settings = SettingsMenuManager.Instance;
+        return settings != null ? PauseMenuScreenField.GetValue(settings) as UIScreen : null;
+    }
+
+    private static Transform FindChildByName(Transform root, string name)
+    {
+        foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+        {
+            if (child != null && child.name == name)
+            {
+                return child;
+            }
+        }
+        return null;
+    }
+}
