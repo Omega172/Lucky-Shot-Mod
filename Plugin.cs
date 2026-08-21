@@ -38,9 +38,6 @@ public class Plugin : BaseUnityPlugin
         WinRound winRound = gameObject.AddComponent<WinRound>();
         winRound.Init(Config);
 
-        ModMenu modMenu = gameObject.AddComponent<ModMenu>();
-        modMenu.Init(Config, aimAssist, triggerbot, infiniteAmmo, instantReload, fireRateModifier, winRound);
-
         ModSettingsScreen modSettingsScreen = gameObject.AddComponent<ModSettingsScreen>();
         modSettingsScreen.Init(aimAssist, triggerbot, infiniteAmmo, instantReload, fireRateModifier, winRound);
 

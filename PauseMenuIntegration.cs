@@ -14,9 +14,9 @@ namespace LuckShotMod;
 // SettingsMenuManager's pause screen is entirely private with no public API for adding
 // entries, so this relies on reflecting one private field (pauseMenuScreen) and searching
 // its hierarchy by GameObject name (the same technique the game's own code uses internally,
-// e.g. ResolveExitToMenuOption searches for a child literally named "ExitToMenu"). If any of
-// this breaks on a game update, injection just silently fails - the F1 hotkey and
-// pause-triggered ModMenu overlay keep working regardless, this is purely additive.
+// e.g. ResolveExitToMenuOption searches for a child literally named "ExitToMenu"). If this
+// breaks on a game update, injection just silently fails - purely additive, nothing else
+// in the mod depends on it.
 public class PauseMenuIntegration : MonoBehaviour
 {
     private const string InjectedButtonName = "LuckShotMod_OpenMenuButton";

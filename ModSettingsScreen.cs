@@ -62,14 +62,44 @@ public class ModSettingsScreen : MonoBehaviour
     // Called by PauseMenuIntegration's cloned "MODS" button.
     public void Open()
     {
-        if (!_built && !TryBuild())
+        Plugin.Logger.LogInfo("[ModSettingsScreen] Open() called.");
+        if (!_built)
         {
-            return;
+            bool built;
+            try
+            {
+                built = TryBuild();
+            }
+            catch (System.Exception ex)
+            {
+                Plugin.Logger.LogError($"[ModSettingsScreen] TryBuild() threw: {ex}");
+                built = false;
+            }
+            if (!built)
+            {
+                Plugin.Logger.LogWarning("[ModSettingsScreen] TryBuild() failed - see preceding log for which step. Not opening.");
+                return;
+            }
         }
         SettingsMenuManager settings = SettingsMenuManager.Instance;
-        if (settings != null)
+        if (settings == null)
         {
-            OpenSubScreenFromPauseMethod?.Invoke(settings, new object[] { _screen });
+            Plugin.Logger.LogWarning("[ModSettingsScreen] Open() aborted: SettingsMenuManager.Instance is null.");
+            return;
+        }
+        if (OpenSubScreenFromPauseMethod == null)
+        {
+            Plugin.Logger.LogWarning("[ModSettingsScreen] Open() aborted: OpenSubScreenFromPauseMethod is null (reflection failed to find the method).");
+            return;
+        }
+        Plugin.Logger.LogInfo("[ModSettingsScreen] Invoking OpenSubScreenFromPause.");
+        try
+        {
+            OpenSubScreenFromPauseMethod.Invoke(settings, new object[] { _screen });
+        }
+        catch (System.Exception ex)
+        {
+            Plugin.Logger.LogError($"[ModSettingsScreen] OpenSubScreenFromPause threw: {ex}");
         }
     }
 
@@ -84,22 +114,28 @@ public class ModSettingsScreen : MonoBehaviour
 
     private bool TryBuild()
     {
+        Plugin.Logger.LogInfo("[ModSettingsScreen] TryBuild() starting.");
+
         if (OpenSubScreenFromPauseMethod == null || BackToPauseMenuFromMethod == null)
         {
+            Plugin.Logger.LogWarning($"[ModSettingsScreen] Abort: reflection failed to find OpenSubScreenFromPause ({OpenSubScreenFromPauseMethod != null}) or BackToPauseMenuFrom ({BackToPauseMenuFromMethod != null}).");
             return false;
         }
 
         SettingsMenuManager settings = SettingsMenuManager.Instance;
         if (settings == null)
         {
+            Plugin.Logger.LogWarning("[ModSettingsScreen] Abort: SettingsMenuManager.Instance is null.");
             return false;
         }
 
         UIScreen original = SettingsScreenField?.GetValue(settings) as UIScreen;
         if (original == null)
         {
+            Plugin.Logger.LogWarning($"[ModSettingsScreen] Abort: settingsScreen field {(SettingsScreenField == null ? "not found by reflection" : "resolved to null")}.");
             return false;
         }
+        Plugin.Logger.LogInfo("[ModSettingsScreen] Found real settings screen, harvesting templates.");
 
         // Harvest reusable templates from the real screen before we start gutting the clone.
         _toggleTemplate = original.GetComponentInChildren<Toggle>(true);
@@ -109,8 +145,10 @@ public class ModSettingsScreen : MonoBehaviour
         _labelTemplate = FindPlainLabel(original.transform);
         if (_toggleTemplate == null || _sliderTemplate == null || _buttonTemplate == null || _labelTemplate == null)
         {
+            Plugin.Logger.LogWarning($"[ModSettingsScreen] Abort: template harvest incomplete - toggle={_toggleTemplate != null}, slider={_sliderTemplate != null}, inputField={_inputFieldTemplate != null}, button={_buttonTemplate != null}, label={_labelTemplate != null}.");
             return false;
         }
+        Plugin.Logger.LogInfo("[ModSettingsScreen] Templates harvested, cloning screen.");
 
         _screen = Instantiate(original, original.transform.parent);
         _screen.gameObject.name = "LuckShotMod_ModsScreen";
@@ -129,10 +167,12 @@ public class ModSettingsScreen : MonoBehaviour
         Transform containerTransform = generalRootOriginal != null ? UiUtil.FindChildByName(cloneRoot, generalRootOriginal.name) : null;
         if (containerTransform == null)
         {
+            Plugin.Logger.LogWarning($"[ModSettingsScreen] Abort: could not find cloned counterpart of generalOptionsRoot (original name: '{generalRootOriginal?.name ?? "null"}').");
             Destroy(_screen.gameObject);
             _screen = null;
             return false;
         }
+        Plugin.Logger.LogInfo($"[ModSettingsScreen] Found container '{containerTransform.name}', building rows.");
         containerTransform.gameObject.SetActive(true);
         _container = containerTransform as RectTransform;
 
@@ -166,10 +206,15 @@ public class ModSettingsScreen : MonoBehaviour
         {
             UiUtil.ReplaceButton(backButtonClone, Back);
         }
+        else
+        {
+            Plugin.Logger.LogWarning($"[ModSettingsScreen] Could not find/rewire back button (original name: '{backButtonOriginal?.gameObject.name ?? "null"}') - screen will open but Back may not work.");
+        }
 
         BuildRows();
 
         _built = true;
+        Plugin.Logger.LogInfo("[ModSettingsScreen] TryBuild() succeeded.");
         return true;
     }
 
