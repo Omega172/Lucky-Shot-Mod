@@ -22,6 +22,7 @@ public class ModMenu : MonoBehaviour
     private WinRound _winRound;
 
     private bool _manuallyOpen;
+    private bool _wasPaused;
     private Rect _windowRect = new Rect(20f, 20f, 340f, 0f);
 
     private string _aimAssistHotkeyBuffer = "";
@@ -58,6 +59,19 @@ public class ModMenu : MonoBehaviour
 
     private void Update()
     {
+        // Clicking our pause-menu button opens the menu by setting _manuallyOpen (see
+        // ToggleOpen), so it stays visible instead of vanishing the instant the pause screen's
+        // own auto-show condition drops. But that means it would otherwise keep showing right
+        // through into live gameplay once the player actually resumes - reset it at exactly
+        // that transition so it never lingers uninvited. This doesn't affect F1 during live
+        // gameplay: that path never touches a pause transition at all.
+        bool isPaused = SettingsMenuManager.IsPaused;
+        if (_wasPaused && !isPaused)
+        {
+            _manuallyOpen = false;
+        }
+        _wasPaused = isPaused;
+
         if (!_menuToggleKeyEnabled.Value)
         {
             return;

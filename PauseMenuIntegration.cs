@@ -1,5 +1,6 @@
 using System.Reflection;
 using HarmonyLib;
+using Shooterlatro.UI.Localization;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -72,6 +73,17 @@ public class PauseMenuIntegration : MonoBehaviour
         TMP_Text label = clone.GetComponentInChildren<TMP_Text>(true);
         if (label != null)
         {
+            // The real Resume label has a LocalizedTMPText component that re-stamps its text
+            // from a localization key on OnEnable/language-change - which happens *after* we
+            // set our own text here, since the whole pause screen (and this freshly cloned
+            // child with it) starts inactive and only actually enables the first time the
+            // player opens pause, silently reverting "MODS" back to "Resume" moments later.
+            // ClearLocalization() makes ApplyLocalization() a permanent no-op going forward.
+            LocalizedTMPText localizedText = label.GetComponent<LocalizedTMPText>();
+            if (localizedText != null)
+            {
+                localizedText.ClearLocalization();
+            }
             label.text = "MODS";
         }
 
