@@ -318,6 +318,8 @@ public class ModSettingsScreen : MonoBehaviour
         _container = _tabContainers[2];
         AddSectionLabel("Rainbow Bullets");
         AddToggleRow("All Effects On Every Shot", RainbowBullets.Enabled);
+        AddSectionLabel("Shop");
+        AddToggleRow("All Holos Are Hacked", AllHolosHacked.Enabled);
 
         _container = _tabContainers[3];
         AddSectionLabel("Win Round");

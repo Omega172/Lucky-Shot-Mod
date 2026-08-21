@@ -38,6 +38,8 @@ public class Plugin : BaseUnityPlugin
         WinRound winRound = gameObject.AddComponent<WinRound>();
         winRound.Init(Config);
 
+        AllHolosHacked.Init(Config);
+
         ModSettingsScreen modSettingsScreen = gameObject.AddComponent<ModSettingsScreen>();
         modSettingsScreen.Init(aimAssist, triggerbot, infiniteAmmo, instantReload, fireRateModifier, winRound);
 
