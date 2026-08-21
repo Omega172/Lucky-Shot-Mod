@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>LuckShotMod</AssemblyName>
+    <Product>OmegaWare Lucky Shot</Product>
+    <Version>1.0.0</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+    <RestoreAdditionalProjectSources>
+      https://api.nuget.org/v3/index.json;
+      https://nuget.bepinex.dev/v3/index.json;
+      https://nuget.samboy.dev/v3/index.json
+    </RestoreAdditionalProjectSources>
+    <RootNamespace>LuckShotMod</RootNamespace>
+    <!-- BepInEx002 false-positives here: Plugin does inherit BaseUnityPlugin (build succeeds with 0 errors),
+         the analyzer just gets confused resolving that symbol against the game's own reference set.
+         Harmony003 false-positives on RainbowBullets.cs's Prefix: it only ever reads
+         context.isExplosionPropagation/isRicochet inside an if-condition, never assigns them. -->
+    <NoWarn>$(NoWarn);BepInEx002;Harmony003</NoWarn>
+    <GameDir>C:\Program Files (x86)\Steam\steamapps\common\Lucky Shot</GameDir>
+    <GameManagedDir>$(GameDir)\LuckyShot_Data\Managed</GameManagedDir>
+    <GamePluginsDir>$(GameDir)\BepInEx\plugins\$(AssemblyName)</GamePluginsDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BepInEx.Analyzers" Version="1.*" PrivateAssets="all" />
+    <PackageReference Include="BepInEx.Unity.Mono" Version="6.0.0-be.*" IncludeAssets="compile" />
+    <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*" />
+	<PackageReference Include="UnityEngine.Modules" Version="6000.3.18" IncludeAssets="compile" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Game types (GameManager, Target, TargetWorld, PlayerCameraController, Weapon, ...) -->
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(GameManagedDir)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- Mouse.current for right-click hold detection -->
+    <Reference Include="Unity.InputSystem">
+      <HintPath>$(GameManagedDir)\Unity.InputSystem.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework.TrimEnd(`0123456789`))' == 'net'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.2" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Drop the built plugin straight into the game's BepInEx/plugins folder so a build is enough to test. -->
+  <Target Name="DeployToGame" AfterTargets="Build">
+    <MakeDir Directories="$(GamePluginsDir)" Condition="!Exists('$(GamePluginsDir)')" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(GamePluginsDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(TargetDir)$(AssemblyName).pdb" DestinationFolder="$(GamePluginsDir)" Condition="Exists('$(TargetDir)$(AssemblyName).pdb')" SkipUnchangedFiles="true" />
+  </Target>
+</Project>
