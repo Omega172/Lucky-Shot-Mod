@@ -142,7 +142,11 @@ public class ModSettingsScreen : MonoBehaviour
         _sliderTemplate = original.GetComponentInChildren<Slider>(true);
         _inputFieldTemplate = original.GetComponentInChildren<TMP_InputField>(true);
         _buttonTemplate = original.GetComponentInChildren<Button>(true);
-        _labelTemplate = FindPlainLabel(original.transform);
+        // Search inside generalOptionsRoot specifically, not the whole screen - a whole-screen
+        // search can find the tab bar's own (much larger, differently-colored) label text
+        // instead of an actual row label like "FOV"/"WEAPON POSITION".
+        GameObject generalRootForLabel = GeneralOptionsRootField?.GetValue(settings) as GameObject;
+        _labelTemplate = generalRootForLabel != null ? FindPlainLabel(generalRootForLabel.transform) : FindPlainLabel(original.transform);
         if (_toggleTemplate == null || _sliderTemplate == null || _buttonTemplate == null || _labelTemplate == null)
         {
             Plugin.Logger.LogWarning($"[ModSettingsScreen] Abort: template harvest incomplete - toggle={_toggleTemplate != null}, slider={_sliderTemplate != null}, inputField={_inputFieldTemplate != null}, button={_buttonTemplate != null}, label={_labelTemplate != null}.");
@@ -186,8 +190,11 @@ public class ModSettingsScreen : MonoBehaviour
         {
             layout = containerTransform.gameObject.AddComponent<VerticalLayoutGroup>();
         }
-        layout.spacing = 6f;
-        layout.childControlHeight = false;
+        layout.spacing = 8f;
+        layout.padding = new RectOffset(4, 4, 4, 4);
+        // childControlHeight must be true, or each row keeps its GameObject-default
+        // RectTransform size instead of the height our own LayoutElement asks for.
+        layout.childControlHeight = true;
         layout.childForceExpandHeight = false;
         layout.childControlWidth = true;
         layout.childForceExpandWidth = true;
@@ -266,20 +273,27 @@ public class ModSettingsScreen : MonoBehaviour
         }
     }
 
+    // Matches the real settings screen's two-column look (label list on the left, controls on
+    // the right, full row width) rather than tightly packing label+control together.
+    private const float ColumnSplit = 0.52f;
+    private const float LabelFontSize = 24f;
+    private static readonly Color LabelColor = new Color(0.6f, 0.92f, 1f);
+    private static readonly Color SectionColor = new Color(0.78f, 1f, 0.3f);
+
     private void AddSectionLabel(string text)
     {
-        TMP_Text label = Instantiate(_labelTemplate, _container);
+        RectTransform row = CreateRow(44f);
+        TMP_Text label = Instantiate(_labelTemplate, row);
         label.gameObject.name = "LuckShotMod_Section";
         StripLocalization(label);
-        label.text = text;
-        label.fontStyle = FontStyles.Bold;
-        SetRowHeight(label.rectTransform, 32f);
+        ConfigureLabelText(label, text, FontStyles.Bold, SectionColor);
+        AnchorStretch(label.rectTransform, 0f, 1f, 0f);
     }
 
     private void AddToggleRow(string labelText, BepInEx.Configuration.ConfigEntry<bool> entry)
     {
-        RectTransform row = CreateRow();
-        CreateLabel(row, labelText);
+        RectTransform row = CreateRow(38f);
+        AddRowLabel(row, labelText);
 
         Toggle toggleTemplate = Instantiate(_toggleTemplate, row);
         toggleTemplate.gameObject.name = "LuckShotMod_Toggle";
@@ -288,25 +302,25 @@ public class ModSettingsScreen : MonoBehaviour
         // GameObject - everything after this must use the returned reference, not the
         // (now-destroyed) local we passed in.
         Toggle toggle = UiUtil.ReplaceToggle(toggleTemplate, entry.Value, value => entry.Value = value);
-        SetControlWidth(toggle.GetComponent<RectTransform>(), 40f);
+        AnchorFixed(toggle.GetComponent<RectTransform>(), ColumnSplit, 28f, 28f);
     }
 
     private void AddSliderRow(string labelText, float min, float max, BepInEx.Configuration.ConfigEntry<float> entry)
     {
-        RectTransform row = CreateRow();
-        CreateLabel(row, labelText);
+        RectTransform row = CreateRow(38f);
+        AddRowLabel(row, labelText);
 
         Slider sliderTemplate = Instantiate(_sliderTemplate, row);
         sliderTemplate.gameObject.name = "LuckShotMod_Slider";
         StripLocalization(sliderTemplate);
         Slider slider = UiUtil.ReplaceSlider(sliderTemplate, min, max, entry.Value, value => entry.Value = value);
-        SetControlWidth(slider.GetComponent<RectTransform>(), 200f);
+        AnchorStretch(slider.GetComponent<RectTransform>(), ColumnSplit, 0.98f, 0.3f);
     }
 
     private void AddHotkeyRow(string labelText, BepInEx.Configuration.ConfigEntry<string> entry)
     {
-        RectTransform row = CreateRow();
-        CreateLabel(row, labelText);
+        RectTransform row = CreateRow(38f);
+        AddRowLabel(row, labelText);
 
         TMP_InputField fieldTemplate = Instantiate(_inputFieldTemplate, row);
         fieldTemplate.gameObject.name = "LuckShotMod_InputField";
@@ -323,16 +337,17 @@ public class ModSettingsScreen : MonoBehaviour
                 field.text = entry.Value;
             }
         });
-        SetControlWidth(field.GetComponent<RectTransform>(), 140f);
+        AnchorFixed(field.GetComponent<RectTransform>(), ColumnSplit, 160f, 32f);
     }
 
     private void AddButtonRow(string labelText, UnityEngine.Events.UnityAction onClick)
     {
-        RectTransform row = CreateRow();
+        RectTransform row = CreateRow(40f);
 
         Button buttonTemplate = Instantiate(_buttonTemplate, row);
         buttonTemplate.gameObject.name = "LuckShotMod_Button";
         Button button = UiUtil.ReplaceButton(buttonTemplate, onClick);
+        AnchorStretch(button.GetComponent<RectTransform>(), 0f, ColumnSplit, 0.05f);
 
         TMP_Text buttonLabel = button.GetComponentInChildren<TMP_Text>(true);
         if (buttonLabel != null)
@@ -340,48 +355,60 @@ public class ModSettingsScreen : MonoBehaviour
             StripLocalization(buttonLabel);
             buttonLabel.text = labelText;
         }
-        SetControlWidth(button.GetComponent<RectTransform>(), 220f);
     }
 
-    private RectTransform CreateRow()
+    private RectTransform CreateRow(float height)
     {
         GameObject rowObject = new GameObject("LuckShotMod_Row", typeof(RectTransform));
-        rowObject.transform.SetParent(_container, false);
-        HorizontalLayoutGroup layout = rowObject.AddComponent<HorizontalLayoutGroup>();
-        layout.childAlignment = TextAnchor.MiddleLeft;
-        layout.spacing = 10f;
-        layout.childControlHeight = true;
-        layout.childControlWidth = false;
-        layout.childForceExpandHeight = false;
-        layout.childForceExpandWidth = false;
         RectTransform rect = rowObject.GetComponent<RectTransform>();
-        SetRowHeight(rect, 30f);
+        rect.SetParent(_container, false);
+        LayoutElement element = rowObject.AddComponent<LayoutElement>();
+        element.minHeight = height;
+        element.preferredHeight = height;
         return rect;
     }
 
-    private void CreateLabel(RectTransform row, string text)
+    private void AddRowLabel(RectTransform row, string text)
     {
         TMP_Text label = Instantiate(_labelTemplate, row);
         label.gameObject.name = "LuckShotMod_Label";
         StripLocalization(label);
+        ConfigureLabelText(label, text, FontStyles.Normal, LabelColor);
+        AnchorStretch(label.rectTransform, 0f, ColumnSplit - 0.02f, 0f);
+    }
+
+    private static void ConfigureLabelText(TMP_Text label, string text, FontStyles style, Color color)
+    {
         label.text = text;
-        label.fontStyle = FontStyles.Normal;
-        SetControlWidth(label.rectTransform, 220f);
+        label.fontStyle = style;
+        label.color = color;
+        label.fontSize = LabelFontSize;
+        label.enableAutoSizing = false;
+        label.textWrappingMode = TextWrappingModes.NoWrap;
+        label.overflowMode = TextOverflowModes.Overflow;
+        label.alignment = TextAlignmentOptions.MidlineLeft;
     }
 
-    private static void SetRowHeight(RectTransform rect, float height)
+    // Stretches rect to fill [minX, maxX] of its parent's width, full height minus verticalPad
+    // fraction top/bottom.
+    private static void AnchorStretch(RectTransform rect, float minX, float maxX, float verticalPad)
     {
-        LayoutElement element = rect.GetComponent<LayoutElement>() ?? rect.gameObject.AddComponent<LayoutElement>();
-        element.minHeight = height;
-        element.preferredHeight = height;
+        rect.anchorMin = new Vector2(minX, verticalPad);
+        rect.anchorMax = new Vector2(maxX, 1f - verticalPad);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        rect.pivot = new Vector2(0.5f, 0.5f);
     }
 
-    private static void SetControlWidth(RectTransform rect, float width)
+    // Places rect at a fixed pixel size, left-anchored at columnX of its parent's width,
+    // vertically centered.
+    private static void AnchorFixed(RectTransform rect, float columnX, float width, float height)
     {
-        LayoutElement element = rect.GetComponent<LayoutElement>() ?? rect.gameObject.AddComponent<LayoutElement>();
-        element.minWidth = width;
-        element.preferredWidth = width;
-        element.flexibleWidth = 0f;
+        rect.anchorMin = new Vector2(columnX, 0.5f);
+        rect.anchorMax = new Vector2(columnX, 0.5f);
+        rect.pivot = new Vector2(0f, 0.5f);
+        rect.sizeDelta = new Vector2(width, height);
+        rect.anchoredPosition = Vector2.zero;
     }
 
     // Prevents a cloned label from getting its text stamped back to the original's localized
