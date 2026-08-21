@@ -8,7 +8,8 @@ using UnityEngine.UI;
 namespace LuckShotMod;
 
 // Best-effort attempt to add a real button into the game's own pause menu (a clone of the
-// existing "Resume" button, for matching style/layout/animation) that opens ModMenu.
+// existing "Resume" button, for matching style/layout/animation) that opens ModSettingsScreen -
+// a real page in the pause menu, the same way clicking "Settings" opens one.
 //
 // SettingsMenuManager's pause screen is entirely private with no public API for adding
 // entries, so this relies on reflecting one private field (pauseMenuScreen) and searching
@@ -23,12 +24,12 @@ public class PauseMenuIntegration : MonoBehaviour
 
     private static readonly FieldInfo PauseMenuScreenField = AccessTools.Field(typeof(SettingsMenuManager), "pauseMenuScreen");
 
-    private ModMenu _modMenu;
+    private ModSettingsScreen _modSettingsScreen;
     private bool _injected;
 
-    public void Init(ModMenu modMenu)
+    public void Init(ModSettingsScreen modSettingsScreen)
     {
-        _modMenu = modMenu;
+        _modSettingsScreen = modSettingsScreen;
     }
 
     private void Update()
@@ -47,7 +48,7 @@ public class PauseMenuIntegration : MonoBehaviour
             return;
         }
 
-        Transform resumeTransform = FindChildByName(pauseScreen.transform, ResumeButtonName);
+        Transform resumeTransform = UiUtil.FindChildByName(pauseScreen.transform, ResumeButtonName);
         if (resumeTransform == null)
         {
             return;
@@ -68,7 +69,7 @@ public class PauseMenuIntegration : MonoBehaviour
         Button clone = Instantiate(template, template.transform.parent);
         GameObject cloneObject = clone.gameObject;
         cloneObject.name = InjectedButtonName;
-        ReplaceOnClickWithFreshButton(clone);
+        UiUtil.ReplaceButton(clone, () => _modSettingsScreen.Open());
 
         TMP_Text label = cloneObject.GetComponentInChildren<TMP_Text>(true);
         if (label != null)
@@ -91,32 +92,6 @@ public class PauseMenuIntegration : MonoBehaviour
         _injected = true;
     }
 
-    // Button.onClick.RemoveAllListeners() only clears runtime (AddListener) listeners - it
-    // deliberately leaves Editor-wired *persistent* listeners in place (that's Unity's own
-    // documented behavior), and the real Resume button's actual resume action is exactly that
-    // kind of listener. So instead of trying to clear the cloned onClick, replace the whole
-    // Button component with a fresh one (guaranteed-empty onClick), carrying over the visual
-    // interaction state so it still looks and feels like a real button.
-    private void ReplaceOnClickWithFreshButton(Button oldButton)
-    {
-        GameObject targetObject = oldButton.gameObject;
-        Graphic targetGraphic = oldButton.targetGraphic;
-        Selectable.Transition transition = oldButton.transition;
-        ColorBlock colors = oldButton.colors;
-        SpriteState spriteState = oldButton.spriteState;
-        Navigation navigation = oldButton.navigation;
-
-        DestroyImmediate(oldButton);
-
-        Button freshButton = targetObject.AddComponent<Button>();
-        freshButton.targetGraphic = targetGraphic;
-        freshButton.transition = transition;
-        freshButton.colors = colors;
-        freshButton.spriteState = spriteState;
-        freshButton.navigation = navigation;
-        freshButton.onClick.AddListener(_modMenu.ToggleOpen);
-    }
-
     private static UIScreen ResolvePauseScreen()
     {
         if (PauseMenuScreenField == null)
@@ -125,17 +100,5 @@ public class PauseMenuIntegration : MonoBehaviour
         }
         SettingsMenuManager settings = SettingsMenuManager.Instance;
         return settings != null ? PauseMenuScreenField.GetValue(settings) as UIScreen : null;
-    }
-
-    private static Transform FindChildByName(Transform root, string name)
-    {
-        foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
-        {
-            if (child != null && child.name == name)
-            {
-                return child;
-            }
-        }
-        return null;
     }
 }

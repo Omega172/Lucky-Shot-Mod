@@ -41,7 +41,10 @@ public class Plugin : BaseUnityPlugin
         ModMenu modMenu = gameObject.AddComponent<ModMenu>();
         modMenu.Init(Config, aimAssist, triggerbot, infiniteAmmo, instantReload, fireRateModifier, winRound);
 
-        gameObject.AddComponent<PauseMenuIntegration>().Init(modMenu);
+        ModSettingsScreen modSettingsScreen = gameObject.AddComponent<ModSettingsScreen>();
+        modSettingsScreen.Init(aimAssist, triggerbot, infiniteAmmo, instantReload, fireRateModifier, winRound);
+
+        gameObject.AddComponent<PauseMenuIntegration>().Init(modSettingsScreen);
 
         _harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
         _harmony.PatchAll();
