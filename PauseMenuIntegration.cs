@@ -66,11 +66,11 @@ public class PauseMenuIntegration : MonoBehaviour
         }
 
         Button clone = Instantiate(template, template.transform.parent);
-        clone.name = InjectedButtonName;
-        clone.onClick.RemoveAllListeners();
-        clone.onClick.AddListener(_modMenu.ToggleOpen);
+        GameObject cloneObject = clone.gameObject;
+        cloneObject.name = InjectedButtonName;
+        ReplaceOnClickWithFreshButton(clone);
 
-        TMP_Text label = clone.GetComponentInChildren<TMP_Text>(true);
+        TMP_Text label = cloneObject.GetComponentInChildren<TMP_Text>(true);
         if (label != null)
         {
             // The real Resume label has a LocalizedTMPText component that re-stamps its text
@@ -87,8 +87,34 @@ public class PauseMenuIntegration : MonoBehaviour
             label.text = "MODS";
         }
 
-        clone.transform.SetSiblingIndex(template.transform.GetSiblingIndex() + 1);
+        cloneObject.transform.SetSiblingIndex(template.transform.GetSiblingIndex() + 1);
         _injected = true;
+    }
+
+    // Button.onClick.RemoveAllListeners() only clears runtime (AddListener) listeners - it
+    // deliberately leaves Editor-wired *persistent* listeners in place (that's Unity's own
+    // documented behavior), and the real Resume button's actual resume action is exactly that
+    // kind of listener. So instead of trying to clear the cloned onClick, replace the whole
+    // Button component with a fresh one (guaranteed-empty onClick), carrying over the visual
+    // interaction state so it still looks and feels like a real button.
+    private void ReplaceOnClickWithFreshButton(Button oldButton)
+    {
+        GameObject targetObject = oldButton.gameObject;
+        Graphic targetGraphic = oldButton.targetGraphic;
+        Selectable.Transition transition = oldButton.transition;
+        ColorBlock colors = oldButton.colors;
+        SpriteState spriteState = oldButton.spriteState;
+        Navigation navigation = oldButton.navigation;
+
+        DestroyImmediate(oldButton);
+
+        Button freshButton = targetObject.AddComponent<Button>();
+        freshButton.targetGraphic = targetGraphic;
+        freshButton.transition = transition;
+        freshButton.colors = colors;
+        freshButton.spriteState = spriteState;
+        freshButton.navigation = navigation;
+        freshButton.onClick.AddListener(_modMenu.ToggleOpen);
     }
 
     private static UIScreen ResolvePauseScreen()
