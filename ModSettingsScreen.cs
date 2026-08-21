@@ -49,6 +49,11 @@ public class ModSettingsScreen : MonoBehaviour
     private TMP_Text _labelTemplate;
     private bool _built;
 
+    private readonly System.Collections.Generic.List<RectTransform> _tabContainers = new System.Collections.Generic.List<RectTransform>(4);
+    private readonly System.Collections.Generic.List<Graphic> _tabButtonGraphics = new System.Collections.Generic.List<Graphic>(4);
+    private static readonly Color TabActiveColor = Color.white;
+    private static readonly Color TabInactiveColor = new Color(1f, 1f, 1f, 0.5f);
+
     public void Init(AimAssist aimAssist, Triggerbot triggerbot, InfiniteAmmo infiniteAmmo, InstantReload instantReload, FireRateModifier fireRateModifier, WinRound winRound)
     {
         _aimAssist = aimAssist;
@@ -159,52 +164,50 @@ public class ModSettingsScreen : MonoBehaviour
         _screen.gameObject.SetActive(false);
         Transform cloneRoot = _screen.transform;
 
-        HideCounterpart(cloneRoot, GraphicOptionsRootField, settings);
-        HideCounterpart(cloneRoot, AudioOptionsRootField, settings);
-        HideCounterpart(cloneRoot, InputOptionsRootField, settings);
-        HideCounterpart(cloneRoot, GeneralOptionsButtonField, settings);
-        HideCounterpart(cloneRoot, GraphicOptionsButtonField, settings);
-        HideCounterpart(cloneRoot, AudioOptionsButtonField, settings);
-        HideCounterpart(cloneRoot, InputOptionsButtonField, settings);
+        // Reuse all four of the real screen's tabs (General/Video/Audio/Input) as our own,
+        // instead of cramming every setting into one long scrolling list under one tab -
+        // matches how the reference screen actually organizes content, and each tab now holds
+        // few enough rows to fit without scrolling.
+        (FieldInfo Root, FieldInfo Button, string Label)[] tabSpecs =
+        {
+            (GeneralOptionsRootField, GeneralOptionsButtonField, "AIM ASSIST"),
+            (GraphicOptionsRootField, GraphicOptionsButtonField, "AMMO & FIRE"),
+            (AudioOptionsRootField, AudioOptionsButtonField, "EFFECTS"),
+            (InputOptionsRootField, InputOptionsButtonField, "MISC"),
+        };
 
-        GameObject generalRootOriginal = GeneralOptionsRootField?.GetValue(settings) as GameObject;
-        Transform containerTransform = generalRootOriginal != null ? UiUtil.FindChildByName(cloneRoot, generalRootOriginal.name) : null;
-        if (containerTransform == null)
+        for (int i = 0; i < tabSpecs.Length; i++)
         {
-            Plugin.Logger.LogWarning($"[ModSettingsScreen] Abort: could not find cloned counterpart of generalOptionsRoot (original name: '{generalRootOriginal?.name ?? "null"}').");
-            Destroy(_screen.gameObject);
-            _screen = null;
-            return false;
-        }
-        Plugin.Logger.LogInfo($"[ModSettingsScreen] Found container '{containerTransform.name}', building rows.");
-        containerTransform.gameObject.SetActive(true);
-        _container = containerTransform as RectTransform;
+            RectTransform container = SetUpTabContainer(cloneRoot, tabSpecs[i].Root, settings);
+            if (container == null)
+            {
+                Plugin.Logger.LogWarning($"[ModSettingsScreen] Abort: could not find/prepare tab container #{i} ('{tabSpecs[i].Label}').");
+                Destroy(_screen.gameObject);
+                _screen = null;
+                return false;
+            }
+            _tabContainers.Add(container);
 
-        for (int i = containerTransform.childCount - 1; i >= 0; i--)
-        {
-            Destroy(containerTransform.GetChild(i).gameObject);
+            Button tabButtonClone = FindCounterpartButton(cloneRoot, tabSpecs[i].Button, settings);
+            if (tabButtonClone != null)
+            {
+                int tabIndex = i;
+                Button fresh = UiUtil.ReplaceButton(tabButtonClone, () => SelectTab(tabIndex));
+                TMP_Text tabLabel = fresh.GetComponentInChildren<TMP_Text>(true);
+                if (tabLabel != null)
+                {
+                    StripLocalization(tabLabel);
+                    tabLabel.text = tabSpecs[i].Label;
+                }
+                _tabButtonGraphics.Add(fresh.targetGraphic);
+            }
+            else
+            {
+                _tabButtonGraphics.Add(null);
+                Plugin.Logger.LogWarning($"[ModSettingsScreen] Could not find/rewire tab button #{i} ('{tabSpecs[i].Label}').");
+            }
         }
-
-        VerticalLayoutGroup layout = containerTransform.GetComponent<VerticalLayoutGroup>();
-        if (layout == null)
-        {
-            layout = containerTransform.gameObject.AddComponent<VerticalLayoutGroup>();
-        }
-        layout.spacing = 8f;
-        layout.padding = new RectOffset(4, 4, 4, 4);
-        // childControlHeight must be true, or each row keeps its GameObject-default
-        // RectTransform size instead of the height our own LayoutElement asks for.
-        layout.childControlHeight = true;
-        layout.childForceExpandHeight = false;
-        layout.childControlWidth = true;
-        layout.childForceExpandWidth = true;
-        layout.childAlignment = TextAnchor.UpperLeft;
-        ContentSizeFitter fitter = containerTransform.GetComponent<ContentSizeFitter>();
-        if (fitter == null)
-        {
-            fitter = containerTransform.gameObject.AddComponent<ContentSizeFitter>();
-        }
-        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        Plugin.Logger.LogInfo("[ModSettingsScreen] Tab containers ready, building rows.");
 
         Button backButtonOriginal = SettingsBackButtonField?.GetValue(settings) as Button;
         Transform backTransform = backButtonOriginal != null ? UiUtil.FindChildByName(cloneRoot, backButtonOriginal.gameObject.name) : null;
@@ -219,14 +222,77 @@ public class ModSettingsScreen : MonoBehaviour
         }
 
         BuildRows();
+        SelectTab(0);
 
         _built = true;
         Plugin.Logger.LogInfo("[ModSettingsScreen] TryBuild() succeeded.");
         return true;
     }
 
+    // Finds the clone's counterpart of an options root by name, activates it, clears any real
+    // settings content out of it, and gives it a fresh VerticalLayoutGroup/ContentSizeFitter
+    // so our own rows stack correctly regardless of what layout the original happened to use.
+    private RectTransform SetUpTabContainer(Transform cloneRoot, FieldInfo rootField, SettingsMenuManager settings)
+    {
+        GameObject original = rootField?.GetValue(settings) as GameObject;
+        Transform counterpart = original != null ? UiUtil.FindChildByName(cloneRoot, original.name) : null;
+        if (counterpart == null)
+        {
+            return null;
+        }
+
+        counterpart.gameObject.SetActive(true);
+        for (int i = counterpart.childCount - 1; i >= 0; i--)
+        {
+            Destroy(counterpart.GetChild(i).gameObject);
+        }
+
+        VerticalLayoutGroup layout = counterpart.GetComponent<VerticalLayoutGroup>();
+        if (layout == null)
+        {
+            layout = counterpart.gameObject.AddComponent<VerticalLayoutGroup>();
+        }
+        layout.spacing = 8f;
+        layout.padding = new RectOffset(4, 4, 4, 4);
+        // childControlHeight must be true, or each row keeps its GameObject-default
+        // RectTransform size instead of the height our own LayoutElement asks for.
+        layout.childControlHeight = true;
+        layout.childForceExpandHeight = false;
+        layout.childControlWidth = true;
+        layout.childForceExpandWidth = true;
+        layout.childAlignment = TextAnchor.UpperLeft;
+        ContentSizeFitter fitter = counterpart.GetComponent<ContentSizeFitter>();
+        if (fitter == null)
+        {
+            fitter = counterpart.gameObject.AddComponent<ContentSizeFitter>();
+        }
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        return counterpart as RectTransform;
+    }
+
+    private static Button FindCounterpartButton(Transform cloneRoot, FieldInfo buttonField, SettingsMenuManager settings)
+    {
+        Button original = buttonField?.GetValue(settings) as Button;
+        Transform counterpart = original != null ? UiUtil.FindChildByName(cloneRoot, original.gameObject.name) : null;
+        return counterpart != null ? counterpart.GetComponent<Button>() : null;
+    }
+
+    private void SelectTab(int index)
+    {
+        for (int i = 0; i < _tabContainers.Count; i++)
+        {
+            _tabContainers[i].gameObject.SetActive(i == index);
+            if (i < _tabButtonGraphics.Count && _tabButtonGraphics[i] != null)
+            {
+                _tabButtonGraphics[i].color = i == index ? TabActiveColor : TabInactiveColor;
+            }
+        }
+    }
+
     private void BuildRows()
     {
+        _container = _tabContainers[0];
         AddSectionLabel("Aim Assist");
         AddToggleRow("Enabled", _aimAssist.Enabled);
         AddToggleRow("Always On", _aimAssist.AlwaysOn);
@@ -234,31 +300,30 @@ public class ModSettingsScreen : MonoBehaviour
         AddHotkeyRow("Hotkey", _aimAssist.Hotkey);
         AddSliderRow("Turn Rate", 60f, 1000f, _aimAssist.TurnRateDegreesPerSecond);
         AddSliderRow("Deadzone", 0f, 2f, _aimAssist.DeadzoneDegrees);
-
         AddSectionLabel("Triggerbot");
         AddToggleRow("Enabled", _triggerbot.Enabled);
         AddToggleRow("Auto-fire With Aim Assist", _triggerbot.AutoFireWithAimAssist);
         AddHotkeyRow("Hotkey", _triggerbot.Hotkey);
         AddSliderRow("Precision", 0.005f, 0.15f, _triggerbot.ViewportThreshold);
 
+        _container = _tabContainers[1];
         AddSectionLabel("Infinite Ammo");
         AddToggleRow("Enabled", _infiniteAmmo.Enabled);
-
         AddSectionLabel("Instant Reload");
         AddToggleRow("Enabled", _instantReload.Enabled);
-
         AddSectionLabel("Fire Rate Modifier");
         AddToggleRow("Enabled", _fireRateModifier.Enabled);
         AddSliderRow("Delta", -20f, 20f, _fireRateModifier.Delta);
 
+        _container = _tabContainers[2];
         AddSectionLabel("Rainbow Bullets");
         AddToggleRow("All Effects On Every Shot", RainbowBullets.Enabled);
 
+        _container = _tabContainers[3];
         AddSectionLabel("Win Round");
         AddToggleRow("Hotkey Enabled", _winRound.Enabled);
         AddHotkeyRow("Hotkey", _winRound.Hotkey);
         AddButtonRow("Win Round Now", _winRound.TryWinRound);
-
         AddSectionLabel("Currency");
         AddButtonRow("Add 500 Coins", () => AddCoins(500));
         AddButtonRow("Add 5000 Coins", () => AddCoins(5000));
@@ -432,24 +497,5 @@ public class ModSettingsScreen : MonoBehaviour
             }
         }
         return null;
-    }
-
-    private static void HideCounterpart(Transform cloneRoot, FieldInfo field, SettingsMenuManager settings)
-    {
-        if (field == null)
-        {
-            return;
-        }
-        Component original = field.GetValue(settings) as Component;
-        GameObject originalObject = original != null ? original.gameObject : field.GetValue(settings) as GameObject;
-        if (originalObject == null)
-        {
-            return;
-        }
-        Transform counterpart = UiUtil.FindChildByName(cloneRoot, originalObject.name);
-        if (counterpart != null)
-        {
-            counterpart.gameObject.SetActive(false);
-        }
     }
 }
