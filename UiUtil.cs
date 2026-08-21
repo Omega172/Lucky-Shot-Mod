@@ -28,6 +28,18 @@ public static class UiUtil
         return null;
     }
 
+    // Destroys a component of type T on go, if present. Used to remove game-specific companion
+    // scripts (e.g. [RequireComponent(typeof(Toggle))] wrappers) that would otherwise block
+    // destroying the control component they depend on.
+    private static void DestroyIfPresent<T>(GameObject go) where T : Component
+    {
+        T component = go.GetComponent<T>();
+        if (component != null)
+        {
+            Object.DestroyImmediate(component);
+        }
+    }
+
     public static Button ReplaceButton(Button old, UnityAction onClick)
     {
         GameObject go = old.gameObject;
@@ -59,6 +71,14 @@ public static class UiUtil
         ColorBlock colors = old.colors;
         SpriteState spriteState = old.spriteState;
         Navigation navigation = old.navigation;
+
+        // Same [RequireComponent(typeof(Toggle))] problem as SliderValueInput has for
+        // TMP_InputField - a few of the settings screen's toggles have one of these game-
+        // specific companion scripts attached, which blocks destroying the Toggle unless
+        // it's removed first.
+        DestroyIfPresent<Shooterlatro.UI.InvertedAimToggle>(go);
+        DestroyIfPresent<Shooterlatro.UI.ControllerAimAssistToggle>(go);
+        DestroyIfPresent<Shooterlatro.UI.NextBulletIndicatorToggle>(go);
 
         Object.DestroyImmediate(old);
 
@@ -118,6 +138,11 @@ public static class UiUtil
         SpriteState spriteState = old.spriteState;
         Navigation navigation = old.navigation;
         TMP_InputField.ContentType contentType = old.contentType;
+
+        // The settings screen's input fields are all paired with a SliderValueInput companion
+        // script that has [RequireComponent(typeof(TMP_InputField))] - Unity refuses to destroy
+        // a component another one on the same GameObject requires, so that has to go first.
+        DestroyIfPresent<Shooterlatro.UI.SliderValueInput>(go);
 
         Object.DestroyImmediate(old);
 
