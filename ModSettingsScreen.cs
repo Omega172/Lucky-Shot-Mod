@@ -305,6 +305,8 @@ public class ModSettingsScreen : MonoBehaviour
         AddToggleRow("Auto-fire With Aim Assist", _triggerbot.AutoFireWithAimAssist);
         AddHotkeyRow("Hotkey", _triggerbot.Hotkey);
         AddSliderRow("Precision", 0.005f, 0.15f, _triggerbot.ViewportThreshold);
+        AddSectionLabel("No Recoil");
+        AddToggleRow("Enabled", NoRecoil.Enabled);
 
         _container = _tabContainers[1];
         AddSectionLabel("Infinite Ammo");

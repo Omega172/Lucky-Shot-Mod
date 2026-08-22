@@ -40,6 +40,8 @@ public class Plugin : BaseUnityPlugin
 
         AllHolosHacked.Init(Config);
 
+        NoRecoil.Init(Config);
+
         ModSettingsScreen modSettingsScreen = gameObject.AddComponent<ModSettingsScreen>();
         modSettingsScreen.Init(aimAssist, triggerbot, infiniteAmmo, instantReload, fireRateModifier, winRound);
 
